@@ -20,6 +20,7 @@ export const App = () => (
       <Route path="/login" element={<LoginPage />} />
       {/* Protected Routes under Dashboard Layout */}
       <Route element={<DashboardLayout />}>
+
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/dashboard/users/create" element={<CreateUsers />} />
         <Route path="/dashboard/users/view" element={<ViewUser />} />
