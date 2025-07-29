@@ -7,7 +7,7 @@
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
-    "migrate": "node node_modules/sequelize-cli/lib/sequelize db:migrate --config config/config.js"
+    "migrate": "node node_modules/sequelize-cli/lib/sequelize db:migrate --config config/config.cjs"
   },
   "keywords": [],
   "author": "",
