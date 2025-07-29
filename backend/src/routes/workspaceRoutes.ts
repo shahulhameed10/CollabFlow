@@ -6,7 +6,8 @@ import { Roles } from '../constants/roles';
 
 const router = Router();
 
-// Only Admin and WorkspaceOwner can create a workspace
+
+//create a new workspace
 router.post(
     '/',
     authenticateToken,
@@ -14,10 +15,12 @@ router.post(
     createWorkspace
 );
 
-// All authenticated users can view workspaces
+// get all workspace
+
 router.get('/', authenticateToken, getAllWorkspaces);
 
-// Only Admin and WorkspaceOwner can update a workspace
+
+//update workspace
 router.put(
     '/:id',
     authenticateToken,

@@ -1,6 +1,8 @@
 import * as dotenv from 'dotenv';
 dotenv.config();
 
+//centralized  and secure app settings 
+
 export const config = {
   db: {
     name: process.env.DB_NAME!,

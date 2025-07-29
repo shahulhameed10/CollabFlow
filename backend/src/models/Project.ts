@@ -2,7 +2,7 @@ import { Model, DataTypes } from 'sequelize';
 import sequelize from '../utils/db';
 import Workspace from './Workspace';
 import Task from './Task';
-import User from './User'; // Import User for team association
+import User from './User'; 
 
 class Project extends Model {
     public id!: number;

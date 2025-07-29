@@ -2,7 +2,6 @@ import { Response, NextFunction } from 'express';
 import { AuthRequest } from '../types/AuthRequest';
 import { Roles } from '../constants/roles';
 
-
 //authorise the user based on role
 export const authorizeRoles = (...allowedRoles: string[]) => {
     return (req: AuthRequest, res: Response, next: NextFunction) => {

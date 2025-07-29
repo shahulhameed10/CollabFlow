@@ -1,5 +1,3 @@
-// models/Task.ts
-
 import { Model, DataTypes } from 'sequelize';
 import sequelize from '../utils/db';
 

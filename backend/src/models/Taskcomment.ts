@@ -34,7 +34,7 @@ TaskComment.init({
     sequelize,
     modelName: 'taskComment',
     tableName: 'task_comments',
-    timestamps: true, // To track createdAt/updatedAt
+    timestamps: true, 
 });
 
 

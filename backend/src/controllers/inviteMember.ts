@@ -1,44 +1,57 @@
-import { Request, Response } from 'express';
-import nodemailer from 'nodemailer';
-import WorkspaceMember from '../models/WorkspaceMember';
+import { Response } from 'express';
+import crypto from 'crypto';
+import nodemailer from 'nodemailer'; // ✅ Make sure nodemailer is installed
+import WorkspaceInvite from '../models/WorkspaceInvite';
+import { AuthRequest } from '../types/AuthRequest';
+import redis from '../utils/redisClient';
 
+export const inviteMember = async (req: AuthRequest, res: Response) => {
+  const { email, role, workspaceId } = req.body;
+  const inviterId = req.user?.id;
 
-//email invite to workspace
-export const inviteMember = async (req: Request, res: Response) => {
-    const { email, role, workspaceId } = req.body;
+  if (!email || !role || !workspaceId) {
+    return res.status(400).json({ message: 'Missing required fields' });
+  }
 
-    try {
-        // Add the member to WorkspaceMember table with status 'Invited'
-        await WorkspaceMember.create({
-            userId: null, // Will be set when user registers
-            email,
-            role,
-            workspaceId,
-        });
+  try {
+    const token = crypto.randomBytes(24).toString('hex');
 
-        // Send Email
-        const transporter = nodemailer.createTransport({
-            service: 'gmail',
-            auth: {
-                user: process.env.EMAIL_USER, // Your email
-                pass: process.env.EMAIL_PASS  // Your app password (not your regular password)
-            }
-        });
+    // Save invite
+    await WorkspaceInvite.create({
+      email,
+      role,
+      workspaceId,
+      token,
+      accepted: false,
+    });
+    //revalidate the workspace data
+    await redis.del("workspaces:all");
 
-        const invitationLink = `http://localhost:3000/invite?workspaceId=${workspaceId}&email=${encodeURIComponent(email)}`;
+    // Prepare email
+    const invitationLink = `http://localhost:3000/invite/accept?token=${token}`;
 
-        const mailOptions = {
-            from: process.env.EMAIL_USER,
-            to: email,
-            subject: 'Workspace Invitation - CollabFlow',
-            html: `<p>You are invited to join workspace ${workspaceId}. Click <a href="${invitationLink}">here</a> to accept.</p>`
-        };
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
+      },
+    });
 
-        await transporter.sendMail(mailOptions);
+    await transporter.sendMail({
+      from: process.env.EMAIL_USER,
+      to: email,
+      subject: 'Workspace Invitation - CollabFlow',
+      html: `
+        <p>Hello,</p>
+        <p>You have been invited to join workspace <strong>${workspaceId}</strong> as <strong>${role}</strong>.</p>
+        <p>Click <a href="${invitationLink}">here</a> to accept the invitation.</p>
+      `,
+    });
 
-        res.status(200).json({ message: 'Invitation sent successfully' });
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ message: 'Failed to send invitation' });
-    }
+    res.status(200).json({ message: 'Invitation sent successfully' });
+  } catch (err) {
+    console.error('Invite Error:', err);
+    res.status(500).json({ message: 'Failed to send invitation' });
+  }
 };

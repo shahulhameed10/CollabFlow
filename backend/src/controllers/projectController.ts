@@ -3,126 +3,138 @@ import Project from '../models/Project';
 import { createClient } from 'redis';
 import Workspace from '../models/Workspace';
 
-
 //create a redisclient for cache
 const redisClient = createClient({
-    url: process.env.REDIS_URL
+  url: process.env.REDIS_URL
 });
-
 redisClient.connect().then(() => {
-    console.log('🟢 Redis connected in projectController');
+  console.log('🟢 Redis connected in projectController');
 }).catch(err => {
-    console.error('❌ Redis connection failed:', err);
+  console.error('❌ Redis connection failed:', err);
 });
 
-// Create a new project
+
+//Create a Project based on workspace id
 export const createProject = async (req: Request, res: Response) => {
-    const { name, description, deadline, workspaceId } = req.body;
+  const { name, description, deadline, workspaceId } = req.body;
 
-    try {
-        // Check if workspace exists
-        const workspace = await Workspace.findByPk(workspaceId);
-        if (!workspace) {
-            return res.status(400).json({ message: 'Invalid workspaceId: Workspace not found' });
-        }
+  try {
+    console.log("Creating Project with workspaceId:", workspaceId);
 
-        const project = await Project.create({ name, description, deadline, workspaceId });
-
-        // Emit socket event
-        const io = req.app.locals.io;
-        io.emit('project-created', project);
-
-        return res.status(201).json({
-            message: 'Project created successfully',
-            project
-        });
-    } catch (err: any) {
-        console.error('Project Creation Error:', err);
-
-        res.status(500).json({
-            message: 'Project creation failed',
-            error: err.message || err.errors || err
-        });
+    if (!workspaceId || isNaN(Number(workspaceId))) {
+      return res.status(400).json({ message: 'Invalid workspaceId: Not a number' });
     }
+
+    const workspace = await Workspace.findByPk(workspaceId);
+    if (!workspace) {
+      return res.status(400).json({ message: 'Invalid workspaceId: Workspace not found' });
+    }
+
+    const project = await Project.create({
+      name,
+      description,
+      deadline: deadline ? new Date(deadline) : null,
+      workspaceId: Number(workspaceId),
+    });
+
+    //key to sore or retrive project data based on workspace id
+    const cacheKey = `projects_workspace_${workspaceId}`;
+    await redisClient.del(cacheKey);
+
+    res.status(201).json({
+      message: 'Project created successfully',
+      project,
+    });
+  } catch (err: any) {
+    console.error('Project Creation Error:', err);
+    res.status(500).json({
+      message: 'Project creation failed',
+      error: err.message || err.errors || err,
+    });
+  }
 };
 
 
+// Get all projects from workspace id with Redis caching
+export const getProjectsByWorkspace = async (req: Request, res: Response) => {
+  const { workspaceId } = req.params;
 
-// Get all projects with Redis caching
-export const getProjects = async (_req: Request, res: Response) => {
-    try {
-        const cachedProjects = await redisClient.get('projects_cache');
-        //cache data response
-        if (cachedProjects) {
-            return res.json({
-                message: 'Projects fetched from cache',
-                projects: JSON.parse(cachedProjects)
-            });
-        }
-
-        //code optimised by with limit and needed data
-        const projects = await Project.findAll({
-            attributes: ['id', 'name', 'description','deadline'], // Fetch only needed columns
-            limit: 10,
-            offset: 0
-        });
-
-
-        // Store in cache for 60 seconds
-        await redisClient.set('projects_cache', JSON.stringify(projects), { EX: 60 }); //stored for 60 sec
-
-
-        //without cache data response
-        res.json({
-            message: 'Projects fetched from DB',
-            projects
-        });
-    } catch (err) {
-        res.status(500).json({ message: 'Error fetching projects', error: err });
+  try {
+    if (!workspaceId) {
+      return res.status(400).json({ message: "workspaceId is required" });
     }
+
+    const cacheKey = `projects_workspace_${workspaceId}`;
+
+    const cached = await redisClient.get(cacheKey);
+    if (cached) {
+      return res.json({
+        message: "Projects fetched from cache",
+        projects: JSON.parse(cached),
+      });
+    }
+
+    const projects = await Project.findAll({
+      where: { workspaceId: Number(workspaceId) },
+      attributes: ['id', 'name', 'description', 'deadline'],
+    });
+
+    await redisClient.set(cacheKey, JSON.stringify(projects), { EX: 60 });
+
+    res.json({
+      message: "Projects fetched from DB",
+      projects,
+    });
+  } catch (err) {
+    console.error("Error fetching projects by workspace:", err);
+    res.status(500).json({ message: "Error fetching projects", error: err });
+  }
 };
+
 
 
 // Update project
 export const updateProject = async (req: Request, res: Response) => {
-    const { id } = req.params;
-    const { name, description } = req.body;
+  const { id } = req.params;
+  const { name, description } = req.body;
 
-    try {
-        const project = await Project.findByPk(id);
-        if (!project) return res.status(404).json({ message: 'Project not found' });
+  try {
+    const project = await Project.findByPk(id);
+    if (!project) return res.status(404).json({ message: 'Project not found' });
 
-        await project.update({ name, description });
+    await project.update({ name, description });
 
-        // Emit socket event
-        const io = req.app.locals.io;
-        io.emit('project-updated', project);
 
-        res.json({
-            message: 'Project updated successfully',
-            project
-        });
-    } catch (err) {
-        res.status(500).json({ message: 'Project update failed', error: err });
-    }
+    const cacheKey = `projects_workspace_${project.workspaceId}`;
+    await redisClient.del(cacheKey);
+
+    res.json({
+      message: 'Project updated successfully',
+      project
+    });
+  } catch (err) {
+    res.status(500).json({ message: 'Project update failed', error: err });
+  }
 };
 
 // Delete project
 export const deleteProject = async (req: Request, res: Response) => {
-    const { id } = req.params;
+  const { id } = req.params;
 
-    try {
-        const project = await Project.findByPk(id);
-        if (!project) return res.status(404).json({ message: 'Project not found' });
+  try {
+    const project = await Project.findByPk(id);
+    if (!project) return res.status(404).json({ message: 'Project not found' });
 
-        await project.destroy();
+    await project.destroy();
 
-        // Emit socket event
-        const io = req.app.locals.io;
-        io.emit('project-deleted', { id });
+    // Emit socket event
 
-        res.json({ message: 'Project deleted successfully' });
-    } catch (err) {
-        res.status(500).json({ message: 'Project deletion failed', error: err });
-    }
+    const cacheKey = `projects_workspace_${project.workspaceId}`;
+    await redisClient.del(cacheKey);
+
+
+    res.json({ message: 'Project deleted successfully' });
+  } catch (err) {
+    res.status(500).json({ message: 'Project deletion failed', error: err });
+  }
 };

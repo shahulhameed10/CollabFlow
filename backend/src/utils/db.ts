@@ -3,6 +3,8 @@ import { config } from '../config/appconfig';
 
 console.log('DB CONFIG:', config.db);
 
+//use sequelise to connect the db
+
 const sequelize = new Sequelize(
     config.db.name,
     config.db.user,
