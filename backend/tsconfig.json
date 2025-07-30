@@ -1,11 +1,14 @@
 {
   "compilerOptions": {
-    "target": "es6",
-    "module": "commonjs",
-    "outDir": "./dist",
-    "rootDir": "./src",
-    "strict": true,
-    "esModuleInterop": true,
-    "typeRoots": ["./src/types", "./node_modules/@types"]
-  }
+    "target": "ES2020",                             // Better async/await and modern JS features
+    "module": "commonjs",                           // Required for Node.js + sequelize-cli
+    "strict": true,                                 // Enables all strict type checking
+    "esModuleInterop": true,                        // Allows import default compatibility
+    "skipLibCheck": true,                           // Skips .d.ts file checks for faster build
+    "forceConsistentCasingInFileNames": true,       // Prevents case mismatches in import paths
+    "outDir": "dist",                               // Output compiled JS here
+    "rootDir": "src"                                // Your actual TypeScript source files
+  },
+  "include": ["src"],
+  "exclude": ["node_modules", "dist"]
 }
